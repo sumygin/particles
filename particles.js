@@ -17,6 +17,8 @@ resizeCanvas();
 // Utility / Drawing
 // ============================================================================
 
+let drawTree = false
+
 const draw = (x, y, r, colour, v) => {
     m.fillStyle = colour;
     m.beginPath();
@@ -130,12 +132,12 @@ function Playbutton(rect) {
 let reactionForce = true;
 let reactions = true;
 let ruleType = "symmetric";
-let constantGravity = false;
 
 let forces = [];
 let minDistances = [];
 let radii = [];
 let colDistances = [];
+let wrap = true
 
 // ============================================================================
 // Buttons
@@ -162,17 +164,7 @@ let buttons = [
         vals: [false, true],
         state: boolToBinaryConverter(reactionForce)
     },
-    {
-        type: "boolean",
-        name: "constantGravity",
-        x: 3,
-        y: 240,
-        width: 50,
-        height: 20,
-        vals: [false, true],
-        state: boolToBinaryConverter(constantGravity)
-    },
-    {
+    /*{
         type: "scroll",
         name: "ruleType",
         x: 3,
@@ -180,8 +172,28 @@ let buttons = [
         width: 50,
         height: 20,
         vals: ["random", "symmetric"],
-        state: boolToBinaryConverter(constantGravity)
-    }
+        state: "HELLO"
+    },*/
+    {
+        type: "boolean",
+        name: "drawTree",
+        x: 3,
+        y: 320,
+        width: 50,
+        height: 20,
+        vals: [false, true],
+        state: boolToBinaryConverter(drawTree)
+    },
+    {
+        type: "boolean",
+        name: "wrap",
+        x: 3,
+        y: 360,
+        width: 50,
+        height: 20,
+        vals: [false, true],
+        state: boolToBinaryConverter(wrap)
+    },
 ];
 
 const btnFunc = btn => {
@@ -189,9 +201,6 @@ const btnFunc = btn => {
         btn.state = (btn.state + 1) % 2;
         eval(`${btn.name} = !${btn.name}`);
 
-        if (["constantGravity"].includes(btn.name)) {
-            setParameters();
-        }
     }
 };
 
@@ -203,7 +212,7 @@ let particles = [];
 
 let particleRadius = 2
 
-const particle = (x, y, c) => ({
+const particle = (x, y, c, m) => ({
     x,
     y,
     v: { x: 0, y: 0 },
@@ -265,17 +274,16 @@ const randomCoords = (colour, type) => {
 // Physics Rules
 // ============================================================================
 
-let minDist = 10;
 let k = 0.05;
-let timeFactor = 5;
-let friction = 0.8;
+let timeFactor = 1;
+let globalFriction = 0.8
+let friction = globalFriction
 
 const numParticles = 5000;
-let wrap = true
 
 let spacing = Math.sqrt((canvas.width*canvas.height) / numParticles)
 
-let radiusScale = 3.5
+let radiusScale = 7
 
 function setParameters() {
     forces = [];
@@ -283,8 +291,8 @@ function setParameters() {
     radii = [];
     colDistances = [];
 
-    const minDistMin = particleRadius;
-    const minDistMax = particleRadius;
+    const minDistMin = particleRadius
+    const minDistMax = particleRadius
 
     const radiusMin = particleRadius*2  +spacing * 0.5;
     const radiusMax = particleRadius*2  +spacing * radiusScale;
@@ -297,24 +305,13 @@ function setParameters() {
         minDistances.push([]);
         radii.push([]);
         colDistances.push([]);
-
         for (let o = 0; o < numColours; o++) {
             minDistances[i].push(randomNum(minDistMin, minDistMax)) 
             radii[i].push(randomNum(radiusMin, radiusMax))
             colDistances[i].push(randomNum(colDistMin, colDistMax));
             forces[i].push(randomVal());
         }
-    }
 
-    if (constantGravity) {
-        for (let i = 0; i < numColours; i++) {
-            for (let o = 0; o < numColours; o++) {
-                minDistances[i][o] = 100;
-                radii[i][o] = 1000;
-                colDistances[i][o] = 1;
-                forces[i][o] = -1;
-            }
-        }
     }
 }
 
@@ -322,7 +319,7 @@ function setParameters() {
 // Quadtree
 // ============================================================================
 
-let maxDepth = 8
+let maxDepth = 7
 
 class Quadtree{
     constructor(x1, x2, y1, y2, d) {
@@ -437,7 +434,7 @@ const create = (number, colour, type) => {
 
     for (let i = 0; i < number; i++) {
         const coords = randomCoords(colour, type);
-        let newParticle = particle(coords[0], coords[1], colour)
+        let newParticle = particle(coords[0], coords[1], colour, cols[colour])
         group.push(newParticle);
         particles.push(newParticle)
         particlesColours[colour].push(newParticle)
@@ -468,6 +465,7 @@ for (let a = 0; a < maxNumColours; a++) {
 // Main Rule Loop
 // ============================================================================
 
+
 const rule = () => {
     let totalRangeQuery = 0
     let totalNumRangeQueries = particles.length
@@ -496,50 +494,52 @@ const rule = () => {
             const b = checkList[o];
             if (a === b) continue;
 
-            let dir = { x: a.x - b.x, y: a.y - b.y };
-            let distsquare = (dir.x * dir.x) + (dir.y * dir.y)
-            if (distsquare > (maxForceRadius*maxForceRadius)) {
-                continue
-            }
+            // displacement vector
+            let dir = { x: b.x - a.x, y: b.y - a.y };
+            let distsquare = dir.x * dir.x + dir.y * dir.y;
+
+            if (distsquare > maxForceRadius * maxForceRadius) continue;
 
             const bcol = cols[b.colour];
 
-            if (dir.x > 0.5 * innerWidth) dir.x -= innerWidth;
-            if (dir.x < -0.5 * innerWidth) dir.x += innerWidth;
-            if (dir.y > 0.5 * innerHeight) dir.y -= innerHeight;
-            if (dir.y < -0.5 * innerHeight) dir.y += innerHeight;
+            
+
 
             let dist = Math.sqrt(distsquare);
             if (dist === 0) dist += randomNum(-1e-7, 1e-7);
 
+            // normalize direction
             dir.x /= dist;
             dir.y /= dist;
 
-            if (dist <= minDistances[acol][bcol]) {
-                totalForce.x += dir.x * forces[acol][bcol] * -1;
-                totalForce.y += dir.y * forces[acol][bcol] * -1;
-            }
 
-            if (dist < radii[acol][bcol] && dist >= minDistances[acol][bcol]) {
-                totalForce.x += scale(dir.x * forces[acol][bcol], 0, minDistances[acol][bcol], 0, 1) * timeFactor * k;
+            // original colour/type-dependent interaction
+            if (dist <= minDistances[acol][bcol]) {
+                totalForce.x += dir.x * forces[acol][bcol];
+                totalForce.y += dir.y * forces[acol][bcol];
+            } else if (dist < radii[acol][bcol]) {
+                totalForce.x += scale(dir.x * forces[acol][bcol], 0, minDistances[acol][bcol], 0, 1) * timeFactor * k; 
                 totalForce.y += scale(dir.y * forces[acol][bcol], 0, minDistances[acol][bcol], 0, 1) * timeFactor * k;
             }
         }
 
+        // update velocity
         a.v.x += totalForce.x / a.m;
         a.v.y += totalForce.y / a.m;
 
+        // update position
         if (wrap) {
             a.x = (a.x + a.v.x + innerWidth) % innerWidth;
             a.y = (a.y + a.v.y + innerHeight) % innerHeight;
         } else {
             a.x = Math.max(0, Math.min(a.x + a.v.x, innerWidth));
             a.y = Math.max(0, Math.min(a.y + a.v.y, innerHeight));
-}
+        }
 
-
+        // optional damping
         a.v.x *= friction;
         a.v.y *= friction;
+
     }
 
     //console.log("AVERAGE", totalRangeQuery/totalNumRangeQueries)
@@ -560,7 +560,7 @@ const update = () => {
         drawParticlesBatch(particlesColours[key], key)
     }
 
-    //drawQuadtree(mainTree)
+    if (drawTree){drawQuadtree(mainTree)}
 
     for (let key in cols) {
         const fontsize = 15;
