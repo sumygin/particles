@@ -283,7 +283,7 @@ const numParticles = 5000;
 
 let spacing = Math.sqrt((canvas.width*canvas.height) / numParticles)
 
-let radiusScale = 7
+let radiusScale = randomNum(4, 10)
 
 function setParameters() {
     forces = [];
@@ -319,7 +319,7 @@ function setParameters() {
 // Quadtree
 // ============================================================================
 
-let maxDepth = 7
+let maxDepth = 5
 
 class Quadtree{
     constructor(x1, x2, y1, y2, d) {
@@ -364,7 +364,7 @@ class Quadtree{
 
     query(box, list) {
         if (this.leaf) {
-            for (a of this.particles) {
+            for (const a of this.particles) {
                 list.push(a)
             }
         }
@@ -387,10 +387,43 @@ class Quadtree{
     }
 }
 
+let ghostRadius = 20
+
 function buildTree() {
     mainTree = new Quadtree(0, canvas.width, 0, canvas.height, 0)
-    for (a of particles) {
-        mainTree.insert(a)
+    for (const p of particles) {
+        // insert real particle
+        mainTree.insert(p);
+
+        // LEFT / RIGHT
+        if (p.x < ghostRadius) {
+            mainTree.insert({ ...p, x: p.x + innerWidth });
+        }
+        if (p.x > innerWidth - ghostRadius) {
+            mainTree.insert({ ...p, x: p.x - innerWidth });
+        }
+
+        // TOP / BOTTOM
+        if (p.y < ghostRadius) {
+            mainTree.insert({ ...p, y: p.y + innerHeight });
+        }
+        if (p.y > innerHeight - ghostRadius) {
+            mainTree.insert({ ...p, y: p.y - innerHeight });
+        }
+
+        // CORNERS
+        if (p.x < ghostRadius && p.y < ghostRadius) {
+            mainTree.insert({ ...p, x: p.x + innerWidth, y: p.y + innerHeight });
+        }
+        if (p.x < ghostRadius && p.y > innerHeight - ghostRadius) {
+            mainTree.insert({ ...p, x: p.x + innerWidth, y: p.y - innerHeight });
+        }
+        if (p.x > innerWidth - ghostRadius && p.y < ghostRadius) {
+            mainTree.insert({ ...p, x: p.x - innerWidth, y: p.y + innerHeight });
+        }
+        if (p.x > innerWidth - ghostRadius && p.y > innerHeight - ghostRadius) {
+            mainTree.insert({ ...p, x: p.x - innerWidth, y: p.y - innerHeight });
+        }
     }
 }
 
