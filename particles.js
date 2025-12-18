@@ -319,7 +319,7 @@ function setParameters() {
 // Quadtree
 // ============================================================================
 
-let maxDepth = 5
+let maxDepth = 6
 
 class Quadtree{
     constructor(x1, x2, y1, y2, d) {
